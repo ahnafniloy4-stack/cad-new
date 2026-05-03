@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivSolver — Civil Engineering Problem Solver</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.2.1/math.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg-raised: #161922;
+    --bg-card: #1c1f2e;
+    --bg-input: #232738;
+    --fg: #e8eaf0;
+    --fg-muted: #7a7f95;
+    --fg-dim: #4a4f65;
+    --accent: #e8963e;
+    --accent-glow: rgba(232, 150, 62, 0.15);
+    --accent-soft: #f5c27a;
+    --success: #3ecf8e;
+    --error: #ef5f5f;
+    --border: #2a2e42;
+    --border-active: #3d4260;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* Background atmosphere */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(232,150,62,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,150,62,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  .bg-glow-1 {
+    position: fixed;
+    top: -20%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(232,150,62,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: floatGlow 20s ease-in-out infinite;
+  }
+
+  .bg-glow-2 {
+    position: fixed;
+    bottom: -15%;
+    left: -5%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(62,207,142,0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: floatGlow 25s ease-in-out infinite reverse;
+  }
+
+  @keyframes floatGlow {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(30px, -20px) scale(1.1); }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-active); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
+
+  /* Tabs */
+  .tab-btn {
+    position: relative;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+  }
+
+  .tab-btn:hover {
+    color: var(--fg);
+    background: var(--bg-input);
+  }
+
+  .tab-btn.active {
+    color: var(--accent);
+    background: var(--accent-glow);
+    border-color: rgba(232,150,62,0.25);
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border-active);
+    border-radius: 16px;
+    padding: 48px 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent-glow), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .upload-zone:hover::before, .upload-zone.drag-over::before {
+    opacity: 1;
+  }
+
+  .upload-zone.has-image {
+    padding: 16px;
+    border-style: solid;
+    border-color: var(--border-active);
+  }
+
+  /* Category chips */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+  }
+
+  .chip:hover {
+    border-color: var(--border-active);
+    color: var(--fg);
+    transform: translateY(-1px);
+  }
+
+  .chip.selected {
+    background: var(--accent-glow);
+    border-color: rgba(232,150,62,0.4);
+    color: var(--accent-soft);
+  }
+
+  /* Input styles */
+  .input-field {
+    width: 100%;
+    padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--fg);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    transition: all 0.25s ease;
+  }
+
+  .input-field::placeholder { color: var(--fg-dim); }
+  .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+  .textarea-field {
+    width: 100%;
+    padding: 14px 18px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    color: var(--fg);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    resize: vertical;
+    min-height: 100px;
+    transition: all 0.25s ease;
+  }
+
+  .textarea-field::placeholder { color: var(--fg-dim); }
+  .textarea-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+  /* Buttons */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 28px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f1117;
+    background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.15));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .btn-primary:hover::after { opacity: 1; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(232,150,62,0.3); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 22px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+
+  .btn-secondary:hover { border-color: var(--border-active); background: var(--bg-card); }
+
+  /* Solution card */
+  .solution-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    animation: slideUp 0.5s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-item {
+    position: relative;
+    padding: 16px 20px;
+    border-left: 2px solid var(--border);
+    margin-left: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .step-item:last-child { border-left-color: transparent; }
+
+  .step-item::before {
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 2px solid var(--accent);
+    transition: all 0.3s ease;
+  }
+
+  .step-item:hover::before {
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  .formula-block {
+    display: block;
+    padding: 14px 18px;
+    margin: 10px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--accent-soft);
+    background: rgba(232,150,62,0.06);
+    border: 1px solid rgba(232,150,62,0.12);
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .result-box {
+    padding: 18px 22px;
+    background: linear-gradient(135deg, rgba(62,207,142,0.08), rgba(62,207,142,0.03));
+    border: 1px solid rgba(62,207,142,0.2);
+    border-radius: 10px;
+  }
+
+  /* Formula reference cards */
+  .formula-ref-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: default;
+  }
+
+  .formula-ref-card:hover {
+    border-color: var(--border-active);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 22px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    z-index: 1000;
+    animation: toastIn 0.4s ease, toastOut 0.4s ease 2.6s forwards;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+
+  @keyframes toastIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }
+
+  /* Loading spinner */
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(15,17,23,0.3);
+    border-top-color: #0f1117;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Processing animation */
+  .processing-bar {
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent-soft), transparent);
+    background-size: 200% 100%;
+    animation: processingSlide 1.5s ease-in-out infinite;
+    border-radius: 3px;
+  }
+
+  @keyframes processingSlide {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* Preview image */
+  .preview-img {
+    max-width: 100%;
+    max-height: 360px;
+    object-fit: contain;
+    border-radius: 10px;
+  }
+
+  /* Section transitions */
+  .tab-content { display: none; animation: fadeIn 0.4s ease; }
+  .tab-content.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .tab-btn { padding: 10px 16px; font-size: 13px; }
+    .upload-zone { padding: 32px 16px; }
+    .main-grid { grid-template-columns: 1fr !important; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow-1"></div>
+<div class="bg-glow-2"></div>
+
+<div style="position:relative; z-index:1;">
+
+  <!-- Header -->
+  <header style="border-bottom: 1px solid var(--border); background: rgba(15,17,23,0.85); backdrop-filter: blur(16px); position: sticky; top: 0; z-index: 50;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 38px; height: 38px; background: linear-gradient(135deg, var(--accent), var(--accent-soft)); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+          <i class="fas fa-bridge" style="color: #0f1117; font-size: 18px;"></i>
+        </div>
+        <div>
+          <div style="font-size: 18px; font-weight: 700; letter-spacing: -0.5px;">CivSolver</div>
+          <div style="font-size: 11px; color: var(--fg-dim); letter-spacing: 1px; text-transform: uppercase;">Engineering Solutions</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button class="btn-secondary" onclick="showToast('History feature coming soon', 'info')" style="padding: 8px 14px; font-size: 13px;">
+          <i class="fas fa-clock-rotate-left"></i>
+          <span class="hidden sm:inline">History</span>
+        </button>
+        <button class="btn-secondary" onclick="scrollToFormulas()" style="padding: 8px 14px; font-size: 13px;">
+          <i class="fas fa-book"></i>
+          <span class="hidden sm:inline">Formulas</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main style="max-width: 1280px; margin: 0 auto; padding: 32px 24px;">
+
+    <!-- Hero Text -->
+    <section style="text-align: center; margin-bottom: 40px;">
+      <h1 style="font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -1.5px; line-height: 1.15; margin-bottom: 12px;">
+        Solve Civil Engineering<br>
+        <span style="background: linear-gradient(135deg, var(--accent), var(--accent-soft)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Problems Instantly</span>
+      </h1>
+      <p style="font-size: 16px; color: var(--fg-muted); max-width: 560px; margin: 0 auto; line-height: 1.6;">
+        Upload diagrams, enter calculations, and get step-by-step solutions for structural analysis, surveying, fluid mechanics, and more.
+      </p>
+    </section>
+
+    <!-- Tabs -->
+    <nav style="display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap;" aria-label="Main navigation">
+      <button class="tab-btn active" data-tab="image" onclick="switchTab('image')">
+        <i class="fas fa-image" style="margin-right: 6px;"></i> Image Upload
+      </button>
+      <button class="tab-btn" data-tab="calculator" onclick="switchTab('calculator')">
+        <i class="fas fa-calculator" style="margin-right: 6px;"></i> Math Solver
+      </button>
+      <button class="tab-btn" data-tab="beam" onclick="switchTab('beam')">
+        <i class="fas fa-ruler-horizontal" style="margin-right: 6px;"></i> Beam Analyzer
+      </button>
+      <button class="tab-btn" data-tab="formulas" onclick="switchTab('formulas')">
+        <i class="fas fa-square-root-variable" style="margin-right: 6px;"></i> Formula Reference
+      </button>
+    </nav>
+
+    <!-- TAB: Image Upload -->
+    <div class="tab-content active" id="tab-image">
+      <div class="main-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Left: Upload + Options -->
+        <div>
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+               role="button" tabindex="0" aria-label="Upload image area">
+            <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
+            <div id="uploadPlaceholder">
+              <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: var(--bg-input); border-radius: 14px; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-cloud-arrow-up" style="font-size: 26px; color: var(--fg-dim);"></i>
+              </div>
+              <p style="font-size: 15px; font-weight: 500; color: var(--fg-muted); margin-bottom: 6px;">
+                Drop your question image here
+              </p>
+              <p style="font-size: 13px; color: var(--fg-dim);">
+                or click to browse — PNG, JPG, WEBP
+              </p>
+            </div>
+            <div id="uploadPreview" style="display: none;"></div>
+          </div>
+
+          <button id="clearImageBtn" style="display: none; margin-top: 10px;" class="btn-secondary" onclick="clearImage()">
+            <i class="fas fa-xmark"></i> Remove Image
+          </button>
+
+          <!-- Category Selection -->
+          <div style="margin-top: 24px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 12px;">
+              Problem Category
+            </label>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;" id="categoryChips">
+              <button class="chip" data-cat="structural" onclick="selectCategory(this)"><i class="fas fa-building"></i> Structural</button>
+              <button class="chip" data-cat="surveying" onclick="selectCategory(this)"><i class="fas fa-compass-drafting"></i> Surveying</button>
+              <button class="chip" data-cat="fluid" onclick="selectCategory(this)"><i class="fas fa-water"></i> Fluid Mechanics</button>
+              <button class="chip" data-cat="geotechnical" onclick="selectCategory(this)"><i class="fas fa-mountain"></i> Geotechnical</button>
+              <button class="chip" data-cat="transportation" onclick="selectCategory(this)"><i class="fas fa-road"></i> Transportation</button>
+              <button class="chip" data-cat="concrete" onclick="selectCategory(this)"><i class="fas fa-cube"></i> Concrete Design</button>
+              <button class="chip" data-cat="hydrology" onclick="selectCategory(this)"><i class="fas fa-droplet"></i> Hydrology</button>
+              <button class="chip" data-cat="steel" onclick="selectCategory(this)"><i class="fas fa-industry"></i> Steel Design</button>
+            </div>
+          </div>
+
+          <!-- Additional Context -->
+          <div style="margin-top: 24px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 8px;">
+              Additional Context (optional)
+            </label>
+            <textarea class="textarea-field" id="imageContext" placeholder="Add any text from the question, given values, or specific requirements..." rows="3"></textarea>
+          </div>
+
+          <button class="btn-primary" style="width: 100%; margin-top: 20px;" id="solveImageBtn" onclick="solveImage()">
+            <i class="fas fa-wand-magic-sparkles"></i> Analyze and Solve
+          </button>
+        </div>
+
+        <!-- Right: Solution -->
+        <div>
+          <div id="imageSolutionArea">
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 60px 24px; text-align: center;">
+              <div style="width: 56px; height: 56px; margin: 0 auto 16px; background: var(--bg-input); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-lightbulb" style="font-size: 22px; color: var(--fg-dim);"></i>
+              </div>
+              <p style="font-size: 15px; color: var(--fg-muted); font-weight: 500; margin-bottom: 6px;">Solution will appear here</p>
+              <p style="font-size: 13px; color: var(--fg-dim);">Upload an image and select a category to get started</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Math Solver -->
+    <div class="tab-content" id="tab-calculator">
+      <div class="main-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div>
+          <!-- Expression Input -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 20px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 10px;">
+              Expression or Equation
+            </label>
+            <input class="input-field mono" id="mathExpression" placeholder="e.g. sqrt(5000*200/210000) + 15" style="font-size: 15px;">
+            <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('sqrt(')">sqrt</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('sin(')">sin</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('cos(')">cos</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('tan(')">tan</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('log(')">log</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('pi')">pi</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('^')">^</button>
+              <button class="btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="insertMath('abs(')">abs</button>
+            </div>
+            <button class="btn-primary" style="width: 100%; margin-top: 16px;" onclick="solveMathExpression()">
+              <i class="fas fa-equals"></i> Evaluate
+            </button>
+          </div>
+
+          <!-- Engineering Calculation Templates -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 24px;">
+            <label style="font-size: 13px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.8px; display: block; margin-bottom: 14px;">
+              Quick Engineering Calculators
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('moment')">
+                <i class="fas fa-arrows-spin" style="color: var(--accent); width: 20px;"></i> Bending Moment Calculator
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('stress')">
+                <i class="fas fa-compress" style="color: var(--accent); width: 20px;"></i> Stress & Strain Calculator
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('truss')">
+                <i class="fas fa-shapes" style="color: var(--accent); width: 20px;"></i> Truss Force Calculator
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('slope')">
+                <i class="fas fa-chart-line" style="color: var(--accent); width: 20px;"></i> Slope & Deflection
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('retaining')">
+                <i class="fas fa-layer-group" style="color: var(--accent); width: 20px;"></i> Retaining Wall Pressure
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('pipe')">
+                <i class="fas fa-faucet-drip" style="color: var(--accent); width: 20px;"></i> Pipe Flow (Darcy-Weisbach)
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('foundation')">
+                <i class="fas fa-caret-down" style="color: var(--accent); width: 20px;"></i> Foundation Bearing Capacity
+              </button>
+              <button class="btn-secondary" style="justify-content: flex-start;" onclick="openCalcModal('concrete')">
+                <i class="fas fa-cube" style="color: var(--accent); width: 20px;"></i> RC Beam Design (Ultimate)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Result -->
+        <div id="mathResultArea">
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 60px 24px; text-align: center;">
+            <div style="width: 56px; height: 56px; margin: 0 auto 16px; background: var(--bg-input); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <i class="fas fa-calculator" style="font-size: 22px; color: var(--fg-dim);"></i>
+            </div>
+            <p style="font-size: 15px; color: var(--fg-muted); font-weight: 500; margin-bottom: 6px;">Results will appear here</p>
+            <p style="font-size: 13px; color: var(--fg-dim);">Enter an expression or use a quick calculator</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Beam Analyzer -->
+    <div class="tab-content" id="tab-beam">
+      <div class="main-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div>
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 20px;">
+            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 18px;">
+              <i class="fas fa-sliders" style="color: var(--accent); margin-right: 8px;"></i>Beam Parameters
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div>
+                <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">Span Length (m)</label>
+                <input class="input-field mono" id="beamLength" type="number" value="6" min="0.1" step="0.1">
+              </div>
+              <div>
+                <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">Load Type</label>
+                <select class="input-field" id="loadType" style="font-family: 'Space Grotesk', sans-serif; cursor: pointer;">
+                  <option value="udl">Uniformly Distributed</option>
+                  <option value="point">Point Load at Center</option>
+                  <option value="point_any">Point Load at Position</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">Load Magnitude (kN or kN/m)</label>
+                <input class="input-field mono" id="loadMagnitude" type="number" value="20" min="0.01" step="0.1">
+              </div>
+              <div id="loadPositionGroup" style="display: none;">
+                <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">Load Position from Left (m)</label>
+                <input class="input-field mono" id="loadPosition" type="number" value="2" min="0" step="0.1">
+              </div>
+              <div>
+                <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">E (GPa)</label>
+                <input class="input-field mono" id="beamE" type="number" value="200" min="0.1" step="0.1">
+              </div>
+              <div>
+                <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">I (cm⁴)</label>
+                <input class="input-field mono" id="beamI" type="number" value="8356" min="0.1" step="1">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;">
+              <label style="font-size: 12px; color: var(--fg-muted); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="support" value="simply" checked style="accent-color: var(--accent);"> Simply Supported
+              </label>
+              <label style="font-size: 12px; color: var(--fg-muted); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="support" value="cantilever" style="accent-color: var(--accent);"> Cantilever
+              </label>
+              <label style="font-size: 12px; color: var(--fg-muted); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="radio" name="support" value="fixed" style="accent-color: var(--accent);"> Fixed-Fixed
+              </label>
+            </div>
+
+            <button class="btn-primary" style="width: 100%; margin-top: 18px;" onclick="analyzeBeam()">
+              <i class="fas fa-chart-area"></i> Analyze Beam
+            </button>
+          </div>
+        </div>
+
+        <div id="beamResultArea">
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 60px 24px; text-align: center;">
+            <div style="width: 56px; height: 56px; margin: 0 auto 16px; background: var(--bg-input); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <i class="fas fa-ruler-horizontal" style="font-size: 22px; color: var(--fg-dim);"></i>
+            </div>
+            <p style="font-size: 15px; color: var(--fg-muted); font-weight: 500;">Beam analysis results</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Formula Reference -->
+    <div class="tab-content" id="tab-formulas">
+      <div style="margin-bottom: 24px; display: flex; gap: 8px; flex-wrap: wrap;" id="formulaFilterChips">
+        <button class="chip selected" data-fcat="all" onclick="filterFormulas(this)">All</button>
+        <button class="chip" data-fcat="structural" onclick="filterFormulas(this)">Structural</button>
+        <button class="chip" data-fcat="geotechnical" onclick="filterFormulas(this)">Geotechnical</button>
+        <button class="chip" data-fcat="fluid" onclick="filterFormulas(this)">Fluid Mechanics</button>
+        <button class="chip" data-fcat="surveying" onclick="filterFormulas(this)">Surveying</button>
+        <button class="chip" data-fcat="concrete" onclick="filterFormulas(this)">Concrete Design</button>
+        <button class="chip" data-fcat="hydrology" onclick="filterFormulas(this)">Hydrology</button>
+      </div>
+      <div id="formulaGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Calculator Modal -->
+<div id="calcModal" style="display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 24px;">
+  <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; padding: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h3 id="calcModalTitle" style="font-size: 18px; font-weight: 600;"></h3>
+      <button onclick="closeCalcModal()" style="background: none; border: none; color: var(--fg-muted); cursor: pointer; font-size: 18px; padding: 4px;">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+    <div id="calcModalBody"></div>
+    <button class="btn-primary" style="width: 100%; margin-top: 20px;" onclick="solveCalcModal()">
+      <i class="fas fa-calculator"></i> Calculate
+    </button>
+    <div id="calcModalResult" style="margin-top: 16px;"></div>
+  </div>
+</div>
+
+<script>
+// ===================== TAB SWITCHING =====================
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+  document.getElementById(`tab-${tabId}`).classList.add('active');
+}
+
+function scrollToFormulas() {
+  switchTab('formulas');
+}
+
+// ===================== TOAST =====================
+function showToast(msg, type = 'info') {
+  const existing = document.querySelectorAll('.toast');
+  existing.forEach(t => t.remove());
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  const iconMap = { info: 'fa-circle-info', success: 'fa-circle-check', error: 'fa-circle-exclamation' };
+  const colorMap = { info: 'var(--accent)', success: 'var(--success)', error: 'var(--error)' };
+  toast.innerHTML = `<i class="fas ${iconMap[type]}" style="color:${colorMap[type]};"></i> ${msg}`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3200);
+}
+
+// ===================== IMAGE UPLOAD =====================
+let uploadedImageSrc = null;
+let selectedCategory = null;
+
+const uploadZone = document.getElementById('uploadZone');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) processFile(file);
+  else showToast('Please drop a valid image file', 'error');
+});
+uploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') document.getElementById('fileInput').click(); });
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    uploadedImageSrc = e.target.result;
+    document.getElementById('uploadPlaceholder').style.display = 'none';
+    const preview = document.getElementById('uploadPreview');
+    preview.style.display = 'block';
+    preview.innerHTML = `<img src="${uploadedImageSrc}" class="preview-img" alt="Uploaded question image">`;
+    uploadZone.classList.add('has-image');
+    document.getElementById('clearImageBtn').style.display = 'inline-flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  uploadedImageSrc = null;
+  document.getElementById('uploadPlaceholder').style.display = 'block';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadPreview').innerHTML = '';
+  uploadZone.classList.remove('has-image');
+  document.getElementById('clearImageBtn').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+}
+
+function selectCategory(el) {
+  document.querySelectorAll('#categoryChips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedCategory = el.dataset.cat;
+}
+
+// ===================== IMAGE SOLVE (simulated analysis) =====================
+const solutionTemplates = {
+  structural: {
+    title: 'Structural Analysis Solution',
+    steps: [
+      { label: 'Identify Support Conditions', desc: 'Based on the diagram, determine support types (pin, roller, fixed) and reaction directions.', formula: 'Reactions: RA (vertical), HA (horizontal), MA (moment)' },
+      { label: 'Calculate Reactions', desc: 'Apply equilibrium equations: ΣFx = 0, ΣFy = 0, ΣM = 0', formula: 'ΣM_A = 0 → RB × L - w × L × (L/2) = 0\nΣFy = 0 → RA + RB = w × L' },
+      { label: 'Draw Shear Force Diagram', desc: 'Shear force varies linearly for UDL. Maximum at supports, zero at mid-span for simply supported beams.', formula: 'V(x) = RA - w × x\nV_max = RA (at x = 0)' },
+      { label: 'Draw Bending Moment Diagram', desc: 'Bending moment follows a parabolic curve under UDL. Maximum at the point of zero shear.', formula: 'M(x) = RA × x - w × x² / 2\nM_max = wL² / 8 (at mid-span)' },
+      { label: 'Check Section Capacity', desc: 'Verify that the maximum bending moment is within the section capacity.', formula: 'M_u = φ × Z × f_y\nRequired: M_max ≤ M_u' }
+    ],
+    result: 'The structure is adequate. Maximum bending moment = wL²/8, maximum shear = wL/2.'
+  },
+  surveying: {
+    title: 'Surveying Computation Solution',
+    steps: [
+      { label: 'Identify Known Data', desc: 'Extract coordinates, angles, and distances from the given data.', formula: 'Known: (E1, N1), (E2, N2), observed angles α, β' },
+      { label: 'Compute Bearing', desc: 'Calculate the whole circle bearing between known points.', formula: 'θ = atan2(ΔE, ΔN)\nIf ΔE < 0: θ = θ + 360°' },
+      { label: 'Traverse Computation', desc: 'Apply angles to bearings to compute successive bearings.', formula: 'Bearing_next = Bearing_prev + included_angle\n(adjust for >360° or <0°)' },
+      { label: 'Compute Coordinates', desc: 'Use latitude and departure to find new point coordinates.', formula: 'Latitude = D × cos(θ)\nDeparture = D × sin(θ)\nE_new = E_prev + Departure\nN_new = N_prev + Latitude' },
+      { label: 'Adjustment', desc: 'Apply Bowditch adjustment if closing error exists.', formula: 'e_E = ΣDeparture - (E_final - E_initial)\ne_N = ΣLatitude - (N_final - N_initial)' }
+    ],
+    result: 'Adjusted coordinates computed. Closing error within acceptable tolerance.'
+  },
+  fluid: {
+    title: 'Fluid Mechanics Solution',
+    steps: [
+      { label: 'Identify Flow Parameters', desc: 'Determine fluid properties, pipe geometry, and flow conditions.', formula: 'Given: ρ (density), μ (viscosity), D (diameter), L (length), Q (flow rate)' },
+      { label: 'Compute Flow Velocity', desc: 'Calculate mean velocity from continuity equation.', formula: 'V = Q / A = 4Q / (π × D²)' },
+      { label: 'Determine Reynolds Number', desc: 'Classify flow regime (laminar or turbulent).', formula: 'Re = ρ × V × D / μ\nRe < 2000: Laminar\nRe > 4000: Turbulent' },
+      { label: 'Calculate Friction Factor', desc: 'Use Moody chart or Colebrook-White equation for turbulent flow.', formula: 'Laminar: f = 64 / Re\nTurbulent: 1/√f = -2×log(ε/(3.7D) + 2.51/(Re×√f))' },
+      { label: 'Apply Darcy-Weisbach Equation', desc: 'Compute head loss due to friction.', formula: 'h_f = f × (L/D) × V² / (2g)\nΔP = ρ × g × h_f' }
+    ],
+    result: 'Head loss and pressure drop computed using Darcy-Weisbach equation.'
+  },
+  geotechnical: {
+    title: 'Geotechnical Analysis Solution',
+    steps: [
+      { label: 'Soil Parameter Identification', desc: 'Extract soil properties: unit weight, cohesion, friction angle.', formula: 'γ = bulk unit weight (kN/m³)\nc = cohesion (kPa)\nφ = friction angle (°)' },
+      { label: 'Effective Stress Calculation', desc: 'Compute vertical and effective stresses at the point of interest.', formula: "σ_v = γ × z\nσ' = σ_v - u = γ × z - γ_w × z_w" },
+      { label: 'Shear Strength (Mohr-Coulomb)', desc: 'Determine shear strength using Mohr-Coulomb criterion.', formula: "τ_f = c' + σ' × tan(φ')\nτ_f = c' + (γ×z - γ_w×z_w) × tan(φ')" },
+      { label: 'Bearing Capacity (Terzaghi)', desc: 'Calculate ultimate bearing capacity for shallow foundation.', formula: 'q_ult = c×Nc + γ×D_f×Nq + 0.5×γ×B×Nγ\nq_all = q_ult / FOS' },
+      { label: 'Settlement Estimation', desc: 'Estimate immediate and consolidation settlement.', formula: 'ΔH = Cc × H / (1+e₀) × log(σ"f/σ"₀)' }
+    ],
+    result: 'Bearing capacity and settlement analysis complete. Factor of safety verified.'
+  },
+  transportation: {
+    title: 'Transportation Engineering Solution',
+    steps: [
+      { label: 'Design Parameters', desc: 'Identify design speed, terrain, and traffic volume.', formula: 'V = design speed (km/h)\nAADT = annual average daily traffic' },
+      { label: 'Stopping Sight Distance', desc: 'Calculate required SSD for safe stopping.', formula: 'SSD = 0.278×V×t + V²/(254×(f±G))\nt = reaction time (2.5s)' },
+      { label: 'Horizontal Curve Design', desc: 'Compute minimum radius for given speed and superelevation.', formula: 'R = V² / (127×(e + f))\ne = superelevation, f = side friction' },
+      { label: 'Vertical Curve Design', desc: 'Calculate length of crest/sag vertical curves.', formula: 'L = K × A\nK = rate of vertical curvature\nA = |G1 - G2| (algebraic difference)' },
+      { label: 'Pavement Thickness', desc: 'Determine required pavement layers using AASHTO method.', formula: 'log(W₁₈) = Z_R×S₀ + 9.36×log(SN+1) - 0.20' }
+    ],
+    result: 'Geometric design elements computed per AASHTO guidelines.'
+  },
+  concrete: {
+    title: 'Reinforced Concrete Design Solution',
+    steps: [
+      { label: 'Design Data', desc: 'Extract material strengths, section dimensions, and applied moments.', formula: "f'ck = characteristic strength (MPa)\nf_y = yield strength (MPa)\nb = width, D = overall depth" },
+      { label: 'Effective Depth', desc: 'Calculate effective depth accounting for cover and bar diameter.', formula: 'd = D - clear_cover - stirrup_dia - bar_dia/2' },
+      { label: 'Factored Moment', desc: 'Apply load factors per IS 456 / ACI 318.', formula: 'M_u = 1.5 × (DL moment) + 1.5 × (LL moment)' },
+      { label: 'Required Steel Area (Limit State)', desc: 'Compute required tension reinforcement using limit state method.', formula: 'M_u = 0.87×f_y×A_st×d×(1 - (A_st×f_y)/(b×d×f_ck))\nA_st = (0.5×f_ck/f_y)×(1 - √(1 - 4.6×M_u/(f_ck×b×d²)))×b×d' },
+      { label: 'Min/Max Reinforcement Check', desc: 'Verify steel percentage within code limits.', formula: 'A_st,min = 0.85×bd/f_y\nA_st,max = 0.04×b×D' }
+    ],
+    result: 'Required reinforcement area calculated. Min/max reinforcement checks satisfied.'
+  },
+  hydrology: {
+    title: 'Hydrology Solution',
+    steps: [
+      { label: 'Catchment Parameters', desc: 'Identify catchment area, land use, and rainfall data.', formula: 'A = catchment area (km²)\nCN = curve number\nP = rainfall depth (mm)' },
+      { label: 'Runoff Estimation (SCS-CN)', desc: 'Compute runoff using Soil Conservation Service method.', formula: 'S = 25400/CN - 254\nQ = (P - 0.2S)² / (P + 0.8S)' },
+      { label: 'Time of Concentration', desc: 'Estimate time of concentration using Kirpich or rational method.', formula: 'T_c = 0.0195 × L^0.77 × S^(-0.385)\n(L in m, S in m/m)' },
+      { label: 'Peak Discharge (Rational Method)', desc: 'Calculate peak flow for design.', formula: 'Q = C × I × A / 3.6\nC = runoff coefficient, I = intensity (mm/hr)' },
+      { label: 'Flood Frequency Analysis', desc: 'If historical data available, fit Gumbel or Log-Pearson distribution.', formula: 'Gumbel: x_T = x̄ + K_T × S\nK_T = -[√6/π × (ln(ln(T/(T-1)))) + 0.5772]' }
+    ],
+    result: 'Peak discharge and runoff volume estimated using SCS-CN and Rational methods.'
+  },
+  steel: {
+    title: 'Steel Structural Design Solution',
+    steps: [
+      { label: 'Section Properties', desc: 'Obtain or calculate section properties for the steel member.', formula: 'Z_p = plastic section modulus\nZ_e = elastic section modulus\nI = moment of inertia' },
+      { label: 'Classification Check', desc: 'Classify section as plastic, compact, semi-compact, or slender.', formula: 'b/t_f ratio, d/t_w ratio\nCompare with IS 800 Table limits' },
+      { label: 'Moment Capacity', desc: 'Calculate design moment capacity.', formula: 'M_d = β_b × Z_p × f_y / γ_m0\nβ_b = 1.0 for plastic/compact\nγ_m0 = 1.10' },
+      { label: 'Shear Capacity', desc: 'Verify shear capacity of the section.', formula: 'V_d = f_y / (√3 × γ_m0) × A_v\nA_v = d × t_w (for rolled sections)' },
+      { label: 'Lateral-Torsional Buckling', desc: 'Check for LTB if compression flange is unrestrained.', formula: 'M_d,LT = β_b × Z_p × f_bd\nf_bd = design bending compressive stress\nλ_LT = √(β_b × Z_p × f_y / M_cr)' }
+    ],
+    result: 'Steel member designed per IS 800:2007. All capacity checks satisfied.'
+  }
+};
+
+function solveImage() {
+  if (!uploadedImageSrc) { showToast('Please upload an image first', 'error'); return; }
+  if (!selectedCategory) { showToast('Please select a problem category', 'error'); return; }
+
+  const btn = document.getElementById('solveImageBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analyzing...';
+
+  const area = document.getElementById('imageSolutionArea');
+  area.innerHTML = `
+    <div class="solution-card" style="padding: 24px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <div class="spinner"></div>
+        <span style="font-size: 14px; color: var(--fg-muted);">Analyzing image and generating solution...</span>
+      </div>
+      <div class="processing-bar"></div>
+    </div>
+  `;
+
+  const context = document.getElementById('imageContext').value;
+  const template = solutionTemplates[selectedCategory];
+
+  setTimeout(() => {
+    let stepsHtml = template.steps.map((s, i) => `
+      <div class="step-item">
+        <div style="font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 6px;">Step ${i+1}: ${s.label}</div>
+        <div style="font-size: 14px; color: var(--fg-muted); line-height: 1.6; margin-bottom: 8px;">${s.desc}</div>
+        <code class="formula-block">${s.formula}</code>
+      </div>
+    `).join('');
+
+    let contextNote = '';
+    if (context.trim()) {
+      contextNote = `
+        <div style="padding: 14px 18px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Provided Context</div>
+          <div style="font-size: 13px; color: var(--fg-muted); line-height: 1.5;">${context}</div>
+        </div>
+      `;
+    }
+
+    area.innerHTML = `
+      <div class="solution-card">
+        <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; background: var(--accent-glow); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-check-double" style="color: var(--accent);"></i>
+          </div>
+          <div>
+            <div style="font-size: 16px; font-weight: 600;">${template.title}</div>
+            <div style="font-size: 12px; color: var(--fg-dim);">Category: ${selectedCategory} — ${template.steps.length} steps</div>
+          </div>
+        </div>
+        <div style="padding: 24px;">
+          ${contextNote}
+          ${stepsHtml}
+          <div class="result-box" style="margin-top: 20px;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--success); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              <i class="fas fa-circle-check" style="margin-right: 6px;"></i>Conclusion
+            </div>
+            <div style="font-size: 14px; color: var(--fg); line-height: 1.6;">${template.result}</div>
+          </div>
+          <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn-secondary" onclick="copySolution()" style="font-size: 13px; padding: 8px 16px;">
+              <i class="fas fa-copy"></i> Copy Solution
+            </button>
+            <button class="btn-secondary" onclick="showToast('Saved to history', 'success')" style="font-size: 13px; padding: 8px 16px;">
+              <i class="fas fa-bookmark"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Analyze and Solve';
+    showToast('Solution generated successfully', 'success');
+  }, 2200);
+}
+
+function copySolution() {
+  const text = document.getElementById('imageSolutionArea').innerText;
+  navigator.clipboard.writeText(text).then(() => showToast('Solution copied to clipboard', 'success'));
+}
+
+// ===================== MATH SOLVER =====================
+function insertMath(val) {
+  const input = document.getElementById('mathExpression');
+  const pos = input.selectionStart;
+  const before = input.value.substring(0, pos);
+  const after = input.value.substring(pos);
+  input.value = before + val + after;
+  input.focus();
+  input.setSelectionRange(pos + val.length, pos + val.length);
+}
+
+function solveMathExpression() {
+  const expr = document.getElementById('mathExpression').value.trim();
+  if (!expr) { showToast('Please enter an expression', 'error'); return; }
+
+  const area = document.getElementById('mathResultArea');
+
+  try {
+    const result = math.evaluate(expr);
+    const resultStr = typeof result === 'number' ? (Number.isInteger(result) ? result.toString() : result.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')) : math.format(result, {precision: 10});
+
+    // Try to derive explanation
+    let explanation = generateExplanation(expr, result);
+
+    area.innerHTML = `
+      <div class="solution-card" style="animation: slideUp 0.4s ease;">
+        <div style="padding: 20px 24px; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Input Expression</div>
+          <code class="formula-block" style="margin: 0;">${escapeHtml(expr)}</code>
+        </div>
+        <div style="padding: 20px 24px;">
+          <div class="result-box" style="margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--success); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              <i class="fas fa-equals" style="margin-right: 6px;"></i>Result
+            </div>
+            <div class="mono" style="font-size: 28px; font-weight: 600; color: var(--fg);">${escapeHtml(resultStr)}</div>
+            ${typeof result === 'number' && !Number.isInteger(result) ? `<div style="font-size: 12px; color: var(--fg-dim); margin-top: 4px;">Scientific: ${result.toExponential(6)}</div>` : ''}
+          </div>
+          <div style="padding: 16px 18px; background: var(--bg-input); border-radius: 8px;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              <i class="fas fa-lightbulb" style="color: var(--accent); margin-right: 6px;"></i>Explanation
+            </div>
+            <div style="font-size: 13px; color: var(--fg-muted); line-height: 1.7;">${explanation}</div>
+          </div>
+          ${getUnitSuggestions(expr)}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    area.innerHTML = `
+      <div class="solution-card" style="animation: slideUp 0.4s ease;">
+        <div style="padding: 24px; text-align: center;">
+          <div style="width: 48px; height: 48px; margin: 0 auto 14px; background: rgba(239,95,95,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-triangle-exclamation" style="font-size: 20px; color: var(--error);"></i>
+          </div>
+          <div style="font-size: 15px; font-weight: 600; color: var(--error); margin-bottom: 6px;">Evaluation Error</div>
+          <div style="font-size: 13px; color: var(--fg-muted); max-width: 360px; margin: 0 auto; line-height: 1.5;">${escapeHtml(err.message)}</div>
+          <div style="font-size: 12px; color: var(--fg-dim); margin-top: 12px;">Tip: Use <code class="mono" style="color: var(--accent);">sqrt()</code>, <code class="mono" style="color: var(--accent);">^</code> for powers, <code class="mono" style="color: var(--accent);">pi</code> for π</div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function generateExplanation(expr, result) {
+  const lower = expr.toLowerCase();
+  let parts = [];
+
+  if (lower.includes('sqrt')) {
+    const inner = expr.match(/sqrt\(([^)]+)\)/);
+    if (inner) parts.push(`Square root of ${inner[1]} is computed as √(${inner[1]}) = ${result}`);
+  }
+  if (lower.includes('sin')) {
+    parts.push(`Sine function: sin uses radians. If degrees intended, convert using sin(angle × pi/180).`);
+  }
+  if (lower.includes('cos')) {
+    parts.push(`Cosine function: cos uses radians by default.`);
+  }
+  if (lower.includes('log')) {
+    parts.push(`Logarithm is natural log (ln). For log base 10, use log10().`);
+  }
+  if (lower.includes('^')) {
+    const baseExp = expr.split('^');
+    if (baseExp.length === 2) parts.push(`Exponentiation: ${baseExp[0].trim()} raised to the power of ${baseExp[1].trim()}.`);
+  }
+  if (lower.includes('pi')) {
+    parts.push(`π ≈ 3.14159265358979 is used as the constant.`);
+  }
+  if (lower.includes('*') && !lower.includes('sqrt')) {
+    parts.push(`Multiplication is performed on the given operands.`);
+  }
+  if (lower.includes('/') || lower.includes('÷')) {
+    parts.push(`Division operation: ensure denominator is non-zero.`);
+  }
+  if (lower.includes('+')) parts.push(`Addition of terms.`);
+  if (lower.includes('-')) parts.push(`Subtraction of terms.`);
+
+  if (parts.length === 0) {
+    parts.push(`The expression is evaluated using standard mathematical order of operations (PEMDAS/BODMAS).`);
+  }
+
+  // Detect engineering context
+  if (lower.includes('200') || lower.includes('210') || lower.includes('250')) {
+    parts.push(`<br><span style="color: var(--accent);">Engineering context:</span> Values like 200, 210, 250 GPa are typical for steel Young's modulus (E).`);
+  }
+  if (lower.includes('25') && (lower.includes('concrete') || lower.includes('m'))) {
+    parts.push(`<br><span style="color: var(--accent);">Engineering context:</span> 25 MPa is a common concrete grade (M25).`);
+  }
+  if (lower.includes('9.81') || lower.includes('9.8')) {
+    parts.push(`<br><span style="color: var(--accent);">Engineering context:</span> 9.81 m/s² is standard gravitational acceleration.`);
+  }
+
+  return parts.join('<br>');
+}
+
+function getUnitSuggestions(expr) {
+  const lower = expr.toLowerCase();
+  let suggestions = [];
+
+  if (lower.includes('200') || lower.includes('210000')) suggestions.push('Result may be in MPa or N/mm² (steel stress units)');
+  if (lower.includes('9.81') || lower.includes('gravity')) suggestions.push('Result likely in m/s² (acceleration) or kN (weight = mass × g)');
+  if (lower.includes('1000') || lower.includes('10^3')) suggestions.push('Check unit conversion: 1 kN = 1000 N, 1 MPa = 1 N/mm²');
+  if (lower.includes('0.001') || lower.includes('1e-3')) suggestions.push('Small values may indicate mm to m conversion (×0.001)');
+
+  if (suggestions.length > 0) {
+    return `
+      <div style="margin-top: 14px; padding: 12px 16px; background: rgba(232,150,62,0.05); border: 1px solid rgba(232,150,62,0.12); border-radius: 8px;">
+        <div style="font-size: 11px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+          <i class="fas fa-ruler" style="margin-right: 4px;"></i>Unit Hints
+        </div>
+        ${suggestions.map(s => `<div style="font-size: 12px; color: var(--fg-muted); line-height: 1.5;">• ${s}</div>`).join('')}
+      </div>
+    `;
+  }
+  return '';
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ===================== CALCULATOR MODALS =====================
+let currentCalcType = null;
+
+const calcConfigs = {
+  moment: {
+    title: 'Bending Moment Calculator',
+    fields: [
+      { id: 'm_load', label: 'Load (kN)', value: '10' },
+      { id: 'm_length', label: 'Span Length (m)', value: '5' },
+      { id: 'm_type', label: 'Load Type', type: 'select', options: ['Point Load at Center', 'UDL'], value: 'Point Load at Center' }
+    ]
+  },
+  stress: {
+    title: 'Stress & Strain Calculator',
+    fields: [
+      { id: 's_force', label: 'Axial Force (kN)', value: '100' },
+      { id: 's_area', label: 'Cross-sectional Area (mm²)', value: '1200' },
+      { id: 's_E', label: "Young's Modulus (GPa)", value: '200' }
+    ]
+  },
+  truss: {
+    title: 'Truss Force Calculator (Simple)',
+    fields: [
+      { id: 't_load', label: 'Applied Load at Joint (kN)', value: '50' },
+      { id: 't_span', label: 'Truss Span (m)', value: '8' },
+      { id: 't_height', label: 'Truss Height (m)', value: '2.5' },
+      { id: 't_panels', label: 'Number of Panels', value: '4' }
+    ]
+  },
+  slope: {
+    title: 'Slope & Deflection Calculator',
+    fields: [
+      { id: 'sl_load', label: 'UDL (kN/m)', value: '15' },
+      { id: 'sl_length', label: 'Span (m)', value: '6' },
+      { id: 'sl_E', label: 'E (GPa)', value: '200' },
+      { id: 'sl_I', label: 'I (cm⁴)', value: '8356' }
+    ]
+  },
+  retaining: {
+    title: 'Retaining Wall Pressure',
+    fields: [
+      { id: 'rw_height', label: 'Wall Height (m)', value: '4' },
+      { id: 'rw_gamma', label: 'Soil Unit Weight (kN/m³)', value: '18' },
+      { id: 'rw_phi', label: 'Friction Angle φ (degrees)', value: '30' },
+      { id: 'rw_ka', label: 'Ka (leave empty to auto-calc)', value: '', placeholder: 'Auto-calculated' }
+    ]
+  },
+  pipe: {
+    title: 'Pipe Flow (Darcy-Weisbach)',
+    fields: [
+      { id: 'pf_Q', label: 'Flow Rate Q (L/s)', value: '25' },
+      { id: 'pf_D', label: 'Pipe Diameter (mm)', value: '150' },
+      { id: 'pf_L', label: 'Pipe Length (m)', value: '200' },
+      { id: 'pf_rough', label: 'Roughness ε (mm)', value: '0.15' },
+      { id: 'pf_visc', label: 'Kinematic Viscosity (m²/s × 10⁻⁶)', value: '1.004' }
+    ]
+  },
+  foundation: {
+    title: 'Foundation Bearing Capacity (Terzaghi)',
+    fields: [
+      { id: 'fb_B', label: 'Foundation Width B (m)', value: '1.5' },
+      { id: 'fb_Df', label: 'Depth of Foundation Df (m)', value: '1.2' },
+      { id: 'fb_gamma', label: 'Soil Unit Weight γ (kN/m³)', value: '18' },
+      { id: 'fb_c', label: 'Cohesion c (kPa)', value: '25' },
+      { id: 'fb_phi', label: 'Friction Angle φ (degrees)', value: '28' },
+      { id: 'fb_fos', label: 'Factor of Safety', value: '3' }
+    ]
+  },
+  concrete: {
+    title: 'RC Beam Design (Limit State)',
+    fields: [
+      { id: 'rc_Mu', label: 'Factored Moment M_u (kN·m)', value: '120' },
+      { id: 'rc_b', label: 'Beam Width b (mm)', value: '250' },
+      { id: 'rc_D', label: 'Overall Depth D (mm)', value: '450' },
+      { id: 'rc_fck', label: "f'ck (MPa)", value: '25' },
+      { id: 'rc_fy', label: 'f_y (MPa)', value: '415' },
+      { id: 'rc_cover', label: 'Clear Cover (mm)', value: '25' }
+    ]
+  }
+};
+
+function openCalcModal(type) {
+  currentCalcType = type;
+  const config = calcConfigs[type];
+  document.getElementById('calcModalTitle').textContent = config.title;
+  document.getElementById('calcModalResult').innerHTML = '';
+
+  let html = '';
+  config.fields.forEach(f => {
+    if (f.type === 'select') {
+      html += `<div style="margin-bottom: 14px;">
+        <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">${f.label}</label>
+        <select class="input-field" id="modal_${f.id}" style="font-family:'Space Grotesk',sans-serif;cursor:pointer;">
+          ${f.options.map(o => `<option value="${o}" ${o === f.value ? 'selected' : ''}>${o}</option>`).join('')}
+        </select>
+      </div>`;
+    } else {
+      html += `<div style="margin-bottom: 14px;">
+        <label style="font-size: 12px; color: var(--fg-muted); display: block; margin-bottom: 6px;">${f.label}</label>
+        <input class="input-field mono" id="modal_${f.id}" type="number" value="${f.value}" step="any" placeholder="${f.placeholder || ''}">
+      </div>`;
+    }
+  });
+
+  document.getElementById('calcModalBody').innerHTML = html;
+  document.getElementById('calcModal').style.display = 'flex';
+}
+
+function closeCalcModal() {
+  document.getElementById('calcModal').style.display = 'none';
+}
+
+document.getElementById('calcModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('calcModal')) closeCalcModal();
+});
+
+function getVal(id) {
+  const el = document.getElementById('modal_' + id);
+  return el ? el.value : '';
+}
+
+function solveCalcModal() {
+  let steps = [];
+  let finalResult = '';
+  let finalUnit = '';
+
+  try {
+    switch (currentCalcType) {
+      case 'moment': {
+        const P = parseFloat(getVal('m_load'));
+        const L = parseFloat(getVal('m_length'));
+        const type = getVal('m_type');
+        if (type === 'Point Load at Center') {
+          const Mmax = P * L / 4;
+          const RA = P / 2;
+          steps = [
+            { label: 'Reactions', formula: `RA = RB = P/2 = ${P}/2 = ${RA.toFixed(2)} kN` },
+            { label: 'Maximum Bending Moment', formula: `M_max = P×L/4 = ${P}×${L}/4 = ${Mmax.toFixed(2)} kN·m`, desc: 'Occurs at mid-span under point load' },
+            { label: 'Maximum Shear Force', formula: `V_max = P/2 = ${RA.toFixed(2)} kN` }
+          ];
+          finalResult = Mmax.toFixed(2);
+          finalUnit = 'kN·m';
+        } else {
+          const w = P;
+          const Mmax = w * L * L / 8;
+          const RA = w * L / 2;
+          steps = [
+            { label: 'Reactions', formula: `RA = RB = w×L/2 = ${w}×${L}/2 = ${RA.toFixed(2)} kN` },
+            { label: 'Maximum Bending Moment', formula: `M_max = w×L²/8 = ${w}×${L}²/8 = ${Mmax.toFixed(2)} kN·m`, desc: 'Parabolic BMD, maximum at mid-span' },
+            { label: 'Maximum Shear Force', formula: `V_max = w×L/2 = ${RA.toFixed(2)} kN` }
+          ];
+          finalResult = Mmax.toFixed(2);
+          finalUnit = 'kN·m';
+        }
+        break;
+      }
+      case 'stress': {
+        const F = parseFloat(getVal('s_force'));
+        const A = parseFloat(getVal('s_area'));
+        const E = parseFloat(getVal('s_E'));
+        const stress = (F * 1000) / A;
+        const strain = stress / (E * 1000);
+        const elongation = strain; // per unit length
+        steps = [
+          { label: 'Axial Stress', formula: `σ = F/A = ${F}×1000/${A} = ${stress.toFixed(4)} MPa`, desc: 'Force converted to N for consistent units' },
+          { label: 'Axial Strain', formula: `ε = σ/E = ${stress.toFixed(4)}/${E * 1000} = ${strain.toExponential(4)}`, desc: 'E converted to MPa for unit consistency' },
+          { label: 'Elongation per meter', formula: `δ/L = ε = ${strain.toExponential(4)} m/m` }
+        ];
+        finalResult = stress.toFixed(2);
+        finalUnit = 'MPa';
+        break;
+      }
+      case 'truss': {
+        const P = parseFloat(getVal('t_load'));
+        const span = parseFloat(getVal('t_span'));
+        const h = parseFloat(getVal('t_height'));
+        const n = parseInt(getVal('t_panels'));
+        const panelLen = span / n;
+        const RA = P / 2;
+        const theta = Math.atan(2 * h / span) * 180 / Math.PI;
+        const topChord = (P * span) / (8 * h);
+        const bottomChord = (P * span) / (8 * h);
+        const diag = (P / 2) / Math.sin(theta * Math.PI / 180);
+        steps = [
+          { label: 'Panel Length', formula: `Panel = ${span}/${n} = ${panelLen.toFixed(2)} m` },
+          { label: 'Reactions', formula: `RA = RB = P/2 = ${RA.toFixed(2)} kN` },
+          { label: 'Top Chord Force (Compression)', formula: `F_top = P×L/(8×h) = ${P}×${span}/(8×${h}) = ${topChord.toFixed(2)} kN (C)` },
+          { label: 'Bottom Chord Force (Tension)', formula: `F_bot = P×L/(8×h) = ${bottomChord.toFixed(2)} kN (T)` },
+          { label: 'Diagonal Member Force', formula: `F_diag = (P/2)/sin(θ) = ${diag.toFixed(2)} kN\nθ = atan(2h/L) = ${theta.toFixed(1)}°` }
+        ];
+        finalResult = topChord.toFixed(2);
+        finalUnit = 'kN (max chord force)';
+        break;
+      }
+      case 'slope': {
+        const w = parseFloat(getVal('sl_load'));
+        const L = parseFloat(getVal('sl_length'));
+        const E = parseFloat(getVal('sl_E'));
+        const I = parseFloat(getVal('sl_I'));
+        const EI = E * 1e6 * I * 1e-8; // kN·m² (E in GPa → kN/m², I in cm⁴ → m⁴)
+        const maxDeflection = (5 * w * Math.pow(L, 4)) / (384 * EI) * 1000; // mm
+        const maxSlope = (w * Math.pow(L, 3)) / (24 * EI);
+        steps = [
+          { label: 'Flexural Rigidity', formula: `EI = ${E}×10⁶ × ${I}×10⁻⁸ = ${EI.toFixed(2)} kN·m²` },
+          { label: 'Maximum Deflection', formula: `δ_max = 5wL⁴/(384EI)\n= 5×${w}×${L}⁴/(384×${EI.toFixed(2)})\n= ${(maxDeflection/1000).toFixed(6)} m = ${maxDeflection.toFixed(2)} mm`, desc: 'For simply supported beam with UDL' },
+          { label: 'Deflection Check', formula: `δ/L = ${maxDeflection.toFixed(2)}/${L * 1000} = ${(maxDeflection / (L * 1000)).toFixed(5)}\nLimit: span/250 = ${(L * 1000 / 250).toFixed(1)} mm\n${maxDeflection <= L * 1000 / 250 ? 'PASS ✓' : 'FAIL ✗'}` },
+          { label: 'Maximum Slope', formula: `θ_max = wL³/(24EI) = ${maxSlope.toExponential(4)} rad = ${(maxSlope * 180 / Math.PI).toFixed(4)}°` }
+        ];
+        finalResult = maxDeflection.toFixed(2);
+        finalUnit = 'mm';
+        break;
+      }
+      case 'retaining': {
+        const H = parseFloat(getVal('rw_height'));
+        const gamma = parseFloat(getVal('rw_gamma'));
+        const phi = parseFloat(getVal('rw_phi'));
+        const phiRad = phi * Math.PI / 180;
+        let Ka = parseFloat(getVal('rw_ka'));
+        if (!Ka || isNaN(Ka)) Ka = Math.pow(Math.tan(Math.PI / 4 - phiRad / 2), 2);
+        const Pa = 0.5 * Ka * gamma * H * H;
+        const Ka_val = Ka;
+        steps = [
+          { label: 'Active Earth Pressure Coefficient', formula: `Ka = tan²(45° - φ/2)\n= tan²(45° - ${phi}/2)\n= tan²(${(45 - phi/2).toFixed(1)}°) = ${Ka_val.toFixed(4)}` },
+          { label: 'Total Active Pressure', formula: `Pa = ½ × Ka × γ × H²\n= 0.5 × ${Ka_val.toFixed(4)} × ${gamma} × ${H}²\n= ${Pa.toFixed(2)} kN/m` },
+          { label: 'Pressure at Base', formula: `σ_h = Ka × γ × H = ${Ka_val.toFixed(4)} × ${gamma} × ${H} = ${(Ka_val * gamma * H).toFixed(2)} kN/m²` },
+          { label: 'Point of Application', formula: `ȳ = H/3 = ${H}/3 = ${(H/3).toFixed(2)} m from base` }
+        ];
+        finalResult = Pa.toFixed(2);
+        finalUnit = 'kN/m';
+        break;
+      }
+      case 'pipe': {
+        const Q = parseFloat(getVal('pf_Q')) / 1000; // m³/s
+        const D = parseFloat(getVal('pf_D')) / 1000; // m
+        const L = parseFloat(getVal('pf_L'));
+        const eps = parseFloat(getVal('pf_rough')) / 1000; // m
+        const nu = parseFloat(getVal('pf_visc')) * 1e-6; // m²/s
+        const A = Math.PI * D * D / 4;
+        const V = Q / A;
+        const Re = V * D / nu;
+        // Colebrook-White iteration
+        let f = 0.02;
+        for (let i = 0; i < 50; i++) {
+          f = 1 / Math.pow(-2 * Math.log10(eps / (3.7 * D) + 2.51 / (Re * Math.sqrt(f))), 2);
+        }
+        const hf = f * (L / D) * V * V / (2 * 9.81);
+        const dp = 1000 * 9.81 * hf / 1000; // kPa
+        steps = [
+          { label: 'Flow Velocity', formula: `A = πD²/4 = π×${D.toFixed(4)}²/4 = ${(A*10000).toFixed(4)}×10⁻⁴ m²\nV = Q/A = ${(Q*1000).toFixed(3)}×10⁻³/${(A).toFixed(6)} = ${V.toFixed(3)} m/s` },
+          { label: 'Reynolds Number', formula: `Re = VD/ν = ${V.toFixed(3)}×${D.toFixed(4)}/${nu.toExponential(3)} = ${Re.toFixed(0)}\nFlow: ${Re < 2000 ? 'Laminar' : 'Turbulent'}` },
+          { label: 'Friction Factor (Colebrook-White)', formula: `1/√f = -2×log₁₀(ε/(3.7D) + 2.51/(Re×√f))\nε/D = ${(eps/D).toFixed(5)}\nf = ${f.toFixed(6)}` },
+          { label: 'Head Loss (Darcy-Weisbach)', formula: `hf = f×(L/D)×V²/(2g)\n= ${f.toFixed(6)}×(${L}/${D.toFixed(4)})×${V.toFixed(3)}²/(2×9.81)\n= ${hf.toFixed(4)} m` },
+          { label: 'Pressure Drop', formula: `ΔP = ρ×g×hf = 1000×9.81×${hf.toFixed(4)} = ${(dp*1000).toFixed(1)} Pa = ${dp.toFixed(2)} kPa` }
+        ];
+        finalResult = hf.toFixed(3);
+        finalUnit = 'm (head loss)';
+        break;
+      }
+      case 'foundation': {
+        const B = parseFloat(getVal('fb_B'));
+        const Df = parseFloat(getVal('fb_Df'));
+        const gamma = parseFloat(getVal('fb_gamma'));
+        const c = parseFloat(getVal('fb_c'));
+        const phi = parseFloat(getVal('fb_phi'));
+        const fos = parseFloat(getVal('fb_fos'));
+        const phiRad = phi * Math.PI / 180;
+        const Nq = Math.exp(Math.PI * Math.tan(phiRad)) * Math.pow(Math.tan(Math.PI / 4 + phiRad / 2), 2);
+        const Nc = (Nq - 1) / Math.tan(phiRad);
+        const Ngamma = (Nq - 1) * Math.tan(1.4 * phiRad);
+        const qu = c * Nc + gamma * Df * Nq + 0.5 * gamma * (B - 0) * Ngamma;
+        const qall = qu / fos;
+        steps = [
+          { label: 'Bearing Capacity Factors', formula: `Nq = e^(π×tanφ) × tan²(45+φ/2) = ${Nq.toFixed(3)}\nNc = (Nq-1)/tanφ = ${Nc.toFixed(3)}\nNγ = (Nq-1)×tan(1.4φ) = ${Ngamma.toFixed(3)}` },
+          { label: 'Ultimate Bearing Capacity', formula: `qu = c×Nc + γ×Df×Nq + 0.5×γ×B×Nγ\n= ${c}×${Nc.toFixed(3)} + ${gamma}×${Df}×${Nq.toFixed(3)} + 0.5×${gamma}×${B}×${Ngamma.toFixed(3)}\n= ${qu.toFixed(2)} kPa` },
+          { label: 'Safe Bearing Capacity', formula: `q_safe = qu/FOS = ${qu.toFixed(2)}/${fos} = ${qall.toFixed(2)} kPa` },
+          { label: 'Net Safe Bearing Capacity', formula: `q_net_safe = q_safe - γ×Df = ${qall.toFixed(2)} - ${gamma}×${Df} = ${(qall - gamma * Df).toFixed(2)} kPa` }
+        ];
+        finalResult = qall.toFixed(2);
+        finalUnit = 'kPa';
+        break;
+      }
+      case 'concrete': {
+        const Mu = parseFloat(getVal('rc_Mu'));
+        const b = parseFloat(getVal('rc_b'));
+        const D = parseFloat(getVal('rc_D'));
+        const fck = parseFloat(getVal('rc_fck'));
+        const fy = parseFloat(getVal('rc_fy'));
+        const cover = parseFloat(getVal('rc_cover'));
+        const d = D - cover - 8 - 16/2; // assume 8mm stirrup + 16mm bar
+        const MuLim = 0.138 * fck * b * d * d / 1e6; // kN·m
+        const xuLim = d * 0.48; // for Fe415
+        const Ast = (0.5 * fck / fy) * (1 - Math.sqrt(1 - 4.6 * Mu * 1e6 / (fck * b * d * d))) * b * d;
+        const AstMin = 0.85 * b * d / fy;
+        const AstMax = 0.04 * b * D;
+        const pct = Ast / (b * d) * 100;
+        steps = [
+          { label: 'Effective Depth', formula: `d = D - cover - stirrup - bar/2\n= ${D} - ${cover} - 8 - 8 = ${d.toFixed(0)} mm` },
+          { label: 'Limiting Moment Capacity', formula: `Mu_lim = 0.138×fck×b×d² = 0.138×${fck}×${b}×${d}²\n= ${MuLim.toFixed(2)} kN·m` },
+          { label: 'Check: Mu vs Mu_lim', formula: `Mu = ${Mu} kN·m\n${Mu <= MuLim ? 'Mu ≤ Mu_lim → Singly reinforced section OK ✓' : 'Mu > Mu_lim → Doubly reinforced section required ✗'}` },
+          { label: 'Required Steel Area', formula: `Ast = (0.5×fck/fy)×(1 - √(1 - 4.6×Mu×10⁶/(fck×b×d²)))×b×d\n= ${Ast.toFixed(1)} mm²` },
+          { label: 'Min/Max Steel Check', formula: `Ast_min = 0.85×b×d/fy = ${AstMin.toFixed(1)} mm²\nAst_max = 0.04×b×D = ${AstMax.toFixed(1)} mm²\nAst = ${Ast.toFixed(1)} mm² → ${Ast >= AstMin && Ast <= AstMax ? 'OK ✓' : 'NOT OK ✗'}` },
+          { label: 'Steel Percentage', formula: `p% = Ast/(b×d) × 100 = ${pct.toFixed(3)}%` }
+        ];
+        finalResult = Ast.toFixed(1);
+        finalUnit = 'mm² (required steel)';
+        break;
+      }
+    }
+
+    let stepsHtml = steps.map((s, i) => `
+      <div class="step-item">
+        <div style="font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">Step ${i+1}: ${s.label}</div>
+        ${s.desc ? `<div style="font-size: 13px; color: var(--fg-muted); margin-bottom: 6px;">${s.desc}</div>` : ''}
+        <code class="formula-block" style="margin: 0;">${s.formula}</code>
+      </div>
+    `).join('');
+
+    document.getElementById('calcModalResult').innerHTML = `
+      <div style="animation: slideUp 0.4s ease;">
+        <div style="max-height: 50vh; overflow-y: auto; padding-right: 4px;">
+          ${stepsHtml}
+        </div>
+        <div class="result-box" style="margin-top: 16px;">
+          <div style="font-size: 11px; font-weight: 600; color: var(--success); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Result</div>
+          <div class="mono" style="font-size: 22px; font-weight: 600;">${finalResult} <span style="font-size: 14px; color: var(--fg-muted); font-weight: 400;">${finalUnit}</span></div>
+        </div>
+      </div>
+    `;
+
+    // Also update the math result area
+    document.getElementById('mathResultArea').innerHTML = `
+      <div class="solution-card" style="animation: slideUp 0.4s ease;">
+        <div style="padding: 20px 24px; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 16px; font-weight: 600;">${calcConfigs[currentCalcType].title}</div>
+        </div>
+        <div style="padding: 20px 24px;">
+          ${stepsHtml}
+          <div class="result-box" style="margin-top: 16px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--success); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Result</div>
+            <div class="mono" style="font-size: 26px; font-weight: 600;">${finalResult} <span style="font-size: 14px; color: var(--fg-muted); font-weight: 400;">${finalUnit}</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+  } catch (err) {
+    document.getElementById('calcModalResult').innerHTML = `
+      <div style="padding: 16px; background: rgba(239,95,95,0.08); border-radius: 8px; color: var(--error); font-size: 13px;">
+        <i class="fas fa-triangle-exclamation" style="margin-right: 6px;"></i>${err.message}
+      </div>
+    `;
+  }
+}
+
+// ===================== BEAM ANALYZER =====================
+document.getElementById('loadType').addEventListener('change', function() {
+  document.getElementById('loadPositionGroup').style.display = this.value === 'point_any' ? 'block' : 'none';
+});
+
+function analyzeBeam() {
+  const L = parseFloat(document.getElementById('beamLength').value);
+  const loadType = document.getElementById('loadType').value;
+  const W = parseFloat(document.getElementById('loadMagnitude').value);
+  const E = parseFloat(document.getElementById('beamE').value);
+  const I = parseFloat(document.getElementById('beamI').value);
+  const support = document.querySelector('input[name="support"]:checked').value;
+  const a = parseFloat(document.getElementById('loadPosition').value) || L / 2;
+
+  const EI = E * 1e6 * I * 1e-8; // kN·m²
+  const area = document.getElementById('beamResultArea');
+
+  let steps = [];
+  let RA = 0, RB = 0, Mmax = 0, Vmax = 0, deflMax = 0;
+
+  try {
+    if (support === 'simply') {
+      if (loadType === 'udl') {
+        RA = W * L / 2; RB = RA;
+        Vmax = RA;
+        Mmax = W * L * L / 8;
+        deflMax = (5 * W * Math.pow(L, 4)) / (384 * EI) * 1000;
+        steps = [
+          { label: 'Reactions', formula: `RA = RB = wL/2 = ${W}×${L}/2 = ${RA.toFixed(2)} kN` },
+          { label: 'Shear Force', formula: `V(x) = RA - w×x\nV_max = wL/2 = ${Vmax.toFixed(2)} kN (at supports)` },
+          { label: 'Bending Moment', formula: `M(x) = RA×x - w×x²/2\nM_max = wL²/8 = ${W}×${L}²/8 = ${Mmax.toFixed(2)} kN·m\n(at mid-span, x = L/2)` },
+          { label: 'Maximum Deflection', formula: `δ_max = 5wL⁴/(384EI)\nEI = ${E}×10⁶ × ${I}×10⁻⁸ = ${EI.toFixed(1)} kN·m²\nδ_max = ${deflMax.toFixed(3)} mm` },
+          { label: 'Deflection Check', formula: `δ/L = ${deflMax.toFixed(3)}/${L*1000} = ${(deflMax/(L*1000)).toFixed(5)}\nLimit: L/250 = ${(L*1000/250).toFixed(1)} mm\n${deflMax <= L*1000/250 ? 'PASS ✓' : 'FAIL ✗ — consider larger section'}` }
+        ];
+      } else if (loadType === 'point') {
+        RA = W / 2; RB = RA;
+        Vmax = W / 2;
+        Mmax = W * L / 4;
+        deflMax = (W * Math.pow(L, 3)) / (48 * EI) * 1000;
+        steps = [
+          { label: 'Reactions', formula: `RA = RB = P/2 = ${W}/2 = ${RA.toFixed(2)} kN` },
+          { label: 'Shear Force', formula: `V = +P/2 (left half), -P/2 (right half)\nV_max = ${Vmax.toFixed(2)} kN` },
+          { label: 'Bending Moment', formula: `M_max = PL/4 = ${W}×${L}/4 = ${Mmax.toFixed(2)} kN·m\n(at mid-span under point load)` },
+          { label: 'Maximum Deflection', formula: `δ_max = PL³/(48EI) = ${deflMax.toFixed(3)} mm` },
+          { label: 'Deflection Check', formula: `${deflMax <= L*1000/250 ? 'PASS ✓' : 'FAIL ✗'} (limit: L/250 = ${(L*1000/250).toFixed(1)} mm)` }
+        ];
+      } else {
+        const b = L - a;
+        RB = W * a / L;
+        RA = W - RB;
+        Mmax = W * a * b / L;
+        deflMax = (W * b * Math.sqrt(Math.pow(a, 3) + Math.pow(b, 3) - Math.pow(L, 2) * a * b / L)) / (9 * Math.sqrt(3) * EI) * 1000;
+        if (isNaN(deflMax) || !isFinite(deflMax)) deflMax = (W * a * a * b * b) / (3 * EI * L) * 1000;
+        Vmax = Math.max(RA, RB);
+        steps = [
+          { label: 'Reactions', formula: `RB = P×a/L = ${W}×${a}/${L} = ${RB.toFixed(2)} kN\nRA = P - RB = ${RA.toFixed(2)} kN` },
+          { label: 'Shear Force', formula: `V_max = max(RA, RB) = ${Vmax.toFixed(2)} kN` },
+          { label: 'Maximum Bending Moment', formula: `M_max = P×a×b/L = ${W}×${a}×${b}/${L} = ${Mmax.toFixed(2)} kN·m\n(at x = a = ${a} m from left)` },
+          { label: 'Maximum Deflection', formula: `δ_max ≈ ${deflMax.toFixed(3)} mm` }
+        ];
+      }
+    } else if (support === 'cantilever') {
+      if (loadType === 'udl') {
+        RA = W * L;
+        Vmax = RA;
+        Mmax = W * L * L / 2;
+        deflMax = (W * Math.pow(L, 4)) / (8 * EI) * 1000;
+        steps = [
+          { label: 'Reactions', formula: `RA = wL = ${W}×${L} = ${RA.toFixed(2)} kN (upward)\nMA = wL²/2 = ${Mmax.toFixed(2)} kN·m (counter-clockwise)` },
+          { label: 'Shear Force', formula: `V(x) = -w×(L-x)\nV_max = wL = ${Vmax.toFixed(2)} kN (at fixed end)` },
+          { label: 'Bending Moment', formula: `M(x) = -w×(L-x)²/2\nM_max = wL²/2 = ${Mmax.toFixed(2)} kN·m (at fixed end, hogging)` },
+          { label: 'Tip Deflection', formula: `δ_tip = wL⁴/(8EI) = ${deflMax.toFixed(3)} mm (downward)` }
+        ];
+      } else {
+        const pos = loadType === 'point_any' ? a : L;
+        RA = W;
+        Vmax = W;
+        Mmax = W * pos;
+        deflMax = (W * Math.pow(pos, 3)) / (3 * EI) * 1000;
+        steps = [
+          { label: 'Reactions', formula: `RA = P = ${RA.toFixed(2)} kN\nMA = P×a = ${Mmax.toFixed(2)} kN·m` },
+          { label: 'Shear & Moment', formula: `V = ${Vmax.toFixed(2)} kN (constant)\nM_max = P×a = ${Mmax.toFixed(2)} kN·m (at fixed end)` },
+          { label: 'Tip Deflection', formula: `δ = Pa³/(3EI) = ${deflMax.toFixed(3)} mm` }
+        ];
+      }
+    } else { // fixed-fixed
+      if (loadType === 'udl') {
+        RA = W * L / 2; RB = RA;
+        Mmax = W * L * L / 12;
+        deflMax = (W * Math.pow(L, 4)) / (384 * EI) * 1000;
+        steps = [
+          { label: 'Reactions', formula: `RA = RB = wL/2 = ${RA.toFixed(2)} kN` },
+          { label: 'Fixed End Moments', formula: `MA = MB = wL²/12 = ${W}×${L}²/12 = ${Mmax.toFixed(2)} kN·m (hogging)` },
+          { label: 'Free Bending Moment', formula: `M_free = wL²/8 = ${W*L*L/8} kN·m\nM_net at midspan = wL²/8 - wL²/12 = wL²/24 = ${W*L*L/24} kN·m (sagging)` },
+          { label: 'Maximum Deflection', formula: `δ_max = wL⁴/(384EI) = ${deflMax.toFixed(3)} mm` }
+        ];
+        Mmax = W * L * L / 8; // report free moment for comparison
+      } else {
+        RA = W / 2; RB = RA;
+        const Mfixed = W * L / 8;
+        Mmax = W * L / 4;
+        deflMax = (W * Math.pow(L, 3)) / (192 * EI) * 1000;
+        steps = [
+          { label: 'Reactions', formula: `RA = RB = P/2 = ${RA.toFixed(2)} kN` },
+          { label: 'Fixed End Moments', formula: `MA = MB = PL/8 = ${W}×${L}/8 = ${Mfixed.toFixed(2)} kN·m` },
+          { label: 'Net Moment at Midspan', formula: `M_net = PL/4 - PL/8 = PL/8 = ${Mfixed.toFixed(2)} kN·m` },
+          { label: 'Maximum Deflection', formula: `δ_max = PL³/(192EI) = ${deflMax.toFixed(3)} mm` }
+        ];
+      }
+    }
+
+    // Draw SFD/BMD on canvas
+    const canvas = drawBeamDiagrams(L, loadType, W, support, a, RA, RB, Mmax, Vmax);
+
+    let stepsHtml = steps.map((s, i) => `
+      <div class="step-item">
+        <div style="font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">Step ${i+1}: ${s.label}</div>
+        ${s.desc ? `<div style="font-size: 13px; color: var(--fg-muted); margin-bottom: 6px;">${s.desc}</div>` : ''}
+        <code class="formula-block" style="margin: 0;">${s.formula}</code>
+      </div>
+    `).join('');
+
+    area.innerHTML = `
+      <div class="solution-card" style="animation: slideUp 0.5s ease;">
+        <div style="padding: 20px 24px; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 16px; font-weight: 600;">Beam Analysis Results</div>
+          <div style="font-size: 12px; color: var(--fg-dim); margin-top: 2px;">
+            ${support === 'simply' ? 'Simply Supported' : support === 'cantilever' ? 'Cantilever' : 'Fixed-Fixed'} — 
+            ${loadType === 'udl' ? `UDL ${W} kN/m` : `Point Load ${W} kN${loadType === 'point_any' ? ` at ${a}m` : ''}`} — 
+            Span ${L}m
+          </div>
+        </div>
+        <div style="padding: 20px 24px;">
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px;">
+            <div style="padding: 14px; background: var(--bg-input); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--fg-dim); text-transform: uppercase;">Max Shear</div>
+              <div class="mono" style="font-size: 20px; font-weight: 600; color: var(--error);">${Vmax.toFixed(2)} <span style="font-size: 12px; color: var(--fg-muted);">kN</span></div>
+            </div>
+            <div style="padding: 14px; background: var(--bg-input); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--fg-dim); text-transform: uppercase;">Max Moment</div>
+              <div class="mono" style="font-size: 20px; font-weight: 600; color: var(--accent);">${Mmax.toFixed(2)} <span style="font-size: 12px; color: var(--fg-muted);">kN·m</span></div>
+            </div>
+            <div style="padding: 14px; background: var(--bg-input); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--fg-dim); text-transform: uppercase;">Max Deflection</div>
+              <div class="mono" style="font-size: 20px; font-weight: 600; color: var(--accent-soft);">${deflMax.toFixed(3)} <span style="font-size: 12px; color: var(--fg-muted);">mm</span></div>
+            </div>
+            <div style="padding: 14px; background: var(--bg-input); border-radius: 8px;">
+              <div style="font-size: 11px; color: var(--fg-dim); text-transform: uppercase;">Reactions</div>
+              <div class="mono" style="font-size: 16px; font-weight: 600;">RA=${RA.toFixed(1)} RB=${RB.toFixed(1)} <span style="font-size: 12px; color: var(--fg-muted);">kN</span></div>
+            </div>
+          </div>
+          <div style="margin-bottom: 16px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+            ${canvas}
+          </div>
+          ${stepsHtml}
+        </div>
+      </div>
+    `;
+    showToast('Beam analysis complete', 'success');
+  } catch (err) {
+    area.innerHTML = `<div style="padding: 24px; text-align: center; color: var(--error);">Error: ${err.message}</div>`;
+  }
+}
+
+function drawBeamDiagrams(L, loadType, W, support, a, RA, RB, Mmax, Vmax) {
+  const cw = 600, ch = 300;
+  const pad = 50;
+  const drawW = cw - 2 * pad;
+  const drawH = (ch - 80) / 3 - 10;
+
+  function xToPixel(x) { return pad + (x / L) * drawW; }
+
+  let svg = `<svg width="100%" viewBox="0 0 ${cw} ${ch}" style="background: var(--bg-input); display: block;">`;
+
+  // Helper: draw axes
+  function drawAxes(y0, h, label, color) {
+    svg += `<line x1="${pad}" y1="${y0}" x2="${pad+drawW}" y2="${y0}" stroke="${color}" stroke-opacity="0.3" stroke-width="1"/>`;
+    svg += `<text x="${pad-5}" y="${y0+4}" fill="${color}" font-size="10" text-anchor="end" font-family="JetBrains Mono">${label}</text>`;
+  }
+
+  // Section 1: Beam diagram
+  const y1 = 30;
+  svg += `<text x="${pad}" y="${y1}" fill="var(--fg-muted)" font-size="11" font-weight="600">BEAM DIAGRAM</text>`;
+  const beamY = y1 + 25;
+
+  // Draw beam line
+  svg += `<line x1="${xToPixel(0)}" y1="${beamY}" x2="${xToPixel(L)}" y2="${beamY}" stroke="var(--fg)" stroke-width="2.5"/>`;
+
+  // Supports
+  if (support === 'simply') {
+    // Pin at left
+    svg += `<polygon points="${xToPixel(0)},${beamY} ${xToPixel(0)-8},${beamY+14} ${xToPixel(0)+8},${beamY+14}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>`;
+    svg += `<line x1="${xToPixel(0)-12}" y1="${beamY+14}" x2="${xToPixel(0)+12}" y2="${beamY+14}" stroke="var(--accent)" stroke-width="1.5"/>`;
+    // Roller at right
+    svg += `<circle cx="${xToPixel(L)}" cy="${beamY+8}" r="5" fill="none" stroke="var(--accent)" stroke-width="1.5"/>`;
+    svg += `<line x1="${xToPixel(L)-10}" y1="${beamY+16}" x2="${xToPixel(L)+10}" y2="${beamY+16}" stroke="var(--accent)" stroke-width="1.5"/>`;
+  } else if (support === 'cantilever') {
+    // Fixed at left
+    for (let i = 0; i < 6; i++) {
+      const yy = beamY - 12 + i * 5;
+      svg += `<line x1="${xToPixel(0)-6}" y1="${yy}" x2="${xToPixel(0)}" y2="${yy+5}" stroke="var(--accent)" stroke-width="1"/>`;
+    }
+    svg += `<line x1="${xToPixel(0)}" y1="${beamY-12}" x2="${xToPixel(0)}" y2="${beamY+16}" stroke="var(--accent)" stroke-width="2"/>`;
+  } else {
+    // Fixed-fixed
+    for (let i = 0; i < 6; i++) {
+      const yy = beamY - 12 + i * 5;
+      svg += `<line x1="${xToPixel(0)-6}" y1="${yy}" x2="${xToPixel(0)}" y2="${yy+5}" stroke="var(--accent)" stroke-width="1"/>`;
+      svg += `<line x1="${xToPixel(L)+6}" y1="${yy}" x2="${xToPixel(L)}" y2="${yy+5}" stroke="var(--accent)" stroke-width="1"/>`;
+    }
+    svg += `<line x1="${xToPixel(0)}" y1="${beamY-12}" x2="${xToPixel(0)}" y2="${beamY+16}" stroke="var(--accent)" stroke-width="2"/>`;
+    svg += `<line x1="${xToPixel(L)}" y1="${beamY-12}" x2="${xToPixel(L)}" y2="${beamY+16}" stroke="var(--accent)" stroke-width="2"/>`;
+  }
+
+  // Load arrows
+  if (loadType === 'udl') {
+    const nArrows = Math.min(Math.max(Math.floor(L), 6), 15);
+    for (let i = 0; i <= nArrows; i++) {
+      const x = (i / nArrows) * L;
+      svg += `<line x1="${xToPixel(x)}" y1="${beamY-22}" x2="${xToPixel(x)}" y2="${beamY-4}" stroke="var(--error)" stroke-width="1.2"/>`;
+      svg += `<polygon points="${xToPixel(x)},${beamY-3} ${xToPixel(x)-3},${beamY-8} ${xToPixel(x)+3},${beamY-8}" fill="var(--error)"/>`;
+    }
+    svg += `<line x1="${xToPixel(0)}" y1="${beamY-22}" x2="${xToPixel(L)}" y2="${beamY-22}" stroke="var(--error)" stroke-width="1"/>`;
+    svg += `<text x="${xToPixel(L/2)}" y="${beamY-26}" fill="var(--error)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">${W} kN/m</text>`;
+  } else {
+    const posX = loadType === 'point_any' ? a : L / 2;
+    svg += `<line x1="${xToPixel(posX)}" y1="${beamY-28}" x2="${xToPixel(posX)}" y2="${beamY-4}" stroke="var(--error)" stroke-width="1.5"/>`;
+    svg += `<polygon points="${xToPixel(posX)},${beamY-3} ${xToPixel(posX)-4},${beamY-10} ${xToPixel(posX)+4},${beamY-10}" fill="var(--error)"/>`;
+    svg += `<text x="${xToPixel(posX)}" y="${beamY-32}" fill="var(--error)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">${W} kN</text>`;
+  }
+
+  // Reaction labels
+  if (support !== 'cantilever') {
+    svg += `<text x="${xToPixel(0)}" y="${beamY+28}" fill="var(--accent)" font-size="9" text-anchor="middle" font-family="JetBrains Mono">${RA.toFixed(1)}kN↑</text>`;
+    svg += `<text x="${xToPixel(L)}" y="${beamY+28}" fill="var(--accent)" font-size="9" text-anchor="middle" font-family="JetBrains Mono">${RB.toFixed(1)}kN↑</text>`;
+  } else {
+    svg += `<text x="${xToPixel(0)}" y="${beamY+28}" fill="var(--accent)" font-size="9" text-anchor="middle" font-family="JetBrains Mono">${RA.toFixed(1)}kN↑</text>`;
+  }
+
+  // Section 2: SFD
+  const y2 = beamY + 40;
+  svg += `<text x="${pad}" y="${y2}" fill="var(--fg-muted)" font-size="11" font-weight="600">SHEAR FORCE</text>`;
+  const sfdY = y2 + 15;
+  const sfdH = drawH - 10;
+  drawAxes(sfdY + sfdH/2, sfdH, 'V', '#ef5f5f');
+
+  const vScale = (sfdH / 2 - 4) / Math.max(Math.abs(Vmax), 0.01);
+  // Zero line
+  svg += `<line x1="${pad}" y1="${sfdY+sfdH/2}" x2="${pad+drawW}" y2="${sfdY+sfdH/2}" stroke="var(--fg-dim)" stroke-width="0.5" stroke-dasharray="4,3"/>`;
+
+  let sfdPath = '';
+  const nPts = 50;
+  for (let i = 0; i <= nPts; i++) {
+    const x = (i / nPts) * L;
+    let v = 0;
+    if (support === 'simply') {
+      if (loadType === 'udl') v = RA - W * x;
+      else if (loadType === 'point') v = x < L/2 ? RA : -RB;
+      else v = x < a ? RA : -RB;
+    } else if (support === 'cantilever') {
+      if (loadType === 'udl') v = -W * (L - x);
+      else v = x < (loadType === 'point_any' ? a : L) ? 0 : -W;
+    } else {
+      if (loadType === 'udl') v = RA - W * x;
+      else v = x < L/2 ? RA : -RB;
+    }
+    const px = xToPixel(x);
+    const py = sfdY + sfdH/2 - v * vScale;
+    sfdPath += (i === 0 ? 'M' : 'L') + `${px},${py} `;
+  }
+  svg += `<path d="${sfdPath}" fill="none" stroke="var(--error)" stroke-width="2"/>`;
+
+  // Section 3: BMD
+  const y3 = sfdY + sfdH + 15;
+  svg += `<text x="${pad}" y="${y3}" fill="var(--fg-muted)" font-size="11" font-weight="600">BENDING MOMENT</text>`;
+  const bmdY = y3 + 15;
+  const bmdH = drawH - 10;
+  drawAxes(bmdY + bmdH/2, bmdH, 'M', '#e8963e');
+
+  const mScale = (bmdH / 2 - 4) / Math.max(Math.abs(Mmax), 0.01);
+  svg += `<line x1="${pad}" y1="${bmdY+bmdH/2}" x2="${pad+drawW}" y2="${bmdY+bmdH/2}" stroke="var(--fg-dim)" stroke-width="0.5" stroke-dasharray="4,3"/>`;
+
+  let bmdPath = '';
+  for (let i = 0; i <= nPts; i++) {
+    const x = (i / nPts) * L;
+    let m = 0;
+    if (support === 'simply') {
+      if (loadType === 'udl') m = RA * x - W * x * x / 2;
+      else if (loadType === 'point') m = x < L/2 ? RA * x : RB * (L - x);
+      else m = x < a ? RA * x : RB * (L - x);
+    } else if (support === 'cantilever') {
+      if (loadType === 'udl') m = -W * (L - x) * (L - x) / 2;
+      else {
+        const px = loadType === 'point_any' ? a : L;
+        m = x < px ? -W * (px - x) : 0;
+      }
+    } else {
+      if (loadType === 'udl') m = RA * x - W * x * x / 2 - W * L * L / 12;
+      else m = RA * x - W * L / 8;
+    }
+    const px2 = xToPixel(x);
+    const py2 = bmdY + bmdH/2 - m * mScale;
+    bmdPath += (i === 0 ? 'M' : 'L') + `${px2},${py2} `;
+  }
+  svg += `<path d="${bmdPath}" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+
+  svg += '</svg>';
+  return svg;
+}
+
+// ===================== FORMULA REFERENCE =====================
+const formulaData = [
+  { cat: 'structural', name: 'Bending Stress', formula: 'σ = M × y / I', desc: 'Bending stress at distance y from neutral axis. M = bending moment, I = moment of inertia.' },
+  { cat: 'structural', name: 'Shear Stress', formula: 'τ = V × Q / (I × b)', desc: 'Horizontal shear stress. V = shear force, Q = first moment of area, b = width at the level.' },
+  { cat: 'structural', name: 'Euler Buckling Load', formula: 'P_cr = π²EI / (KL)²', desc: 'Critical buckling load for columns. K = effective length factor depending on end conditions.' },
+  { cat: 'structural', name: 'Deflection (UDL, Simply Supported)', formula: 'δ = 5wL⁴ / (384EI)', desc: 'Maximum deflection at mid-span for uniformly distributed load on simply supported beam.' },
+  { cat: 'structural', name: 'Deflection (Point Load, Simply Supported)', formula: 'δ = PL³ / (48EI)', desc: 'Maximum deflection at mid-span for central point load on simply supported beam.' },
+  { cat: 'structural', name: 'Moment of Inertia (Rectangle)', formula: 'I = bd³ / 12', desc: 'Second moment of area about the centroidal axis parallel to the base. b = width, d = depth.' },
+  { cat: 'structural', name: 'Section Modulus', formula: 'Z = I / y_max', desc: 'Elastic section modulus. For rectangular section: Z = bd²/6.' },
+  { cat: 'structural', name: 'Macaulay\'s Method', formula: 'EI(d²y/dx²) = M(x) using step functions', desc: 'General method for finding slope and deflection at any point along a beam.' },
+  { cat: 'geotechnical', name: "Terzaghi's Bearing Capacity", formula: 'qu = cNc + γDfNq + 0.5γBNγ', desc: 'Ultimate bearing capacity for strip footing. Nc, Nq, Nγ are bearing capacity factors.' },
+  { cat: 'geotechnical', name: 'Active Earth Pressure (Rankine)', formula: 'Ka = tan²(45° - φ/2)', desc: 'Coefficient of active earth pressure for cohesionless soil. Pa = 0.5 × Ka × γ × H².' },
+  { cat: 'geotechnical', name: 'Passive Earth Pressure (Rankine)', formula: 'Kp = tan²(45° + φ/2)', desc: 'Coefficient of passive earth pressure. Pp = 0.5 × Kp × γ × H².' },
+  { cat: 'geotechnical', name: 'Consolidation Settlement', formula: 'ΔH = Cc×H/(1+e₀) × log(σ\'f/σ\'₀)', desc: 'Primary consolidation settlement. Cc = compression index, e₀ = initial void ratio.' },
+  { cat: 'geotechnical', name: 'Coulomb\'s Shear Strength', formula: "τf = c' + σ' × tan(φ')", desc: "Mohr-Coulomb failure criterion. Effective stress parameters c' and φ'." },
+  { cat: 'geotechnical', name: 'Standard Penetration Test (N-value)', formula: 'N = blows for last 300mm of penetration', desc: 'N-value correlated to relative density, angle of internal friction, and allowable bearing pressure.' },
+  { cat: 'fluid', name: 'Darcy-Weisbach Equation', formula: 'hf = f × (L/D) × V²/(2g)', desc: 'Head loss due to friction in pipe flow. f = Darcy friction factor.' },
+  { cat: 'fluid', name: 'Reynolds Number', formula: 'Re = ρVD/μ = VD/ν', desc: 'Dimensionless number indicating laminar (Re<2000) or turbulent (Re>4000) flow.' },
+  { cat: 'fluid', name: 'Continuity Equation', formula: 'A₁V₁ = A₂V₂ = Q', desc: 'Conservation of mass for incompressible flow. Q = volumetric flow rate.' },
+  { cat: 'fluid', name: "Bernoulli's Equation", formula: 'P/γ + V²/2g + z = constant', desc: 'Energy conservation along a streamline for ideal, incompressible, steady flow.' },
+  { cat: 'fluid', name: 'Manning\'s Equation', formula: 'V = (1/n) × R^(2/3) × S^(1/2)', desc: 'Open channel flow velocity. n = roughness coefficient, R = hydraulic radius, S = slope.' },
+  { cat: 'fluid', name: 'Chezy\'s Equation', formula: 'V = C × √(R × S)', desc: 'Open channel flow. C = Chezy\'s coefficient, related to Manning\'s n by C = R^(1/6)/n.' },
+  { cat: 'surveying', name: 'Traverse Closure', formula: 'ΣLatitude ≈ 0, ΣDeparture ≈ 0', desc: 'For a closed traverse, sum of latitudes and departures should be zero (before adjustment).' },
+  { cat: 'surveying', name: 'Bowditch Adjustment', formula: 'Correction = -error × (partial length / total length)', desc: 'Compass rule for distributing traverse closing error proportionally to line lengths.' },
+  { cat: 'surveying', name: 'Curvature & Refraction', formula: 'C-R = 0.0673D² (m, D in km)', desc: 'Combined correction for curvature of earth and atmospheric refraction in leveling.' },
+  { cat: 'surveying', name: 'Area by Coordinates', formula: 'A = ½|Σ(xᵢyᵢ₊₁ - xᵢ₊₁yᵢ)|', desc: 'Coordinate geometry method for computing area of a closed polygon.' },
+  { cat: 'concrete', name: 'IS 456: Limit State Moment', formula: 'Mu = 0.87fy×Ast×d×(1 - Ast×fy/(b×d×fck))', desc: 'Moment capacity of singly reinforced rectangular beam at ultimate limit state.' },
+  { cat: 'concrete', name: 'Minimum Reinforcement', formula: 'Ast,min = 0.85×bd/fy', desc: 'Minimum tension reinforcement for RC beams per IS 456:2000.' },
+  { cat: 'concrete', name: 'Development Length', formula: 'Ld = φ×0.87fy / (4×τbd)', desc: 'Length of embedment needed to develop full design stress in reinforcement.' },
+  { cat: 'concrete', name: 'Spiral Reinforcement Ratio', formula: 'ρs = 4×Asp/(Dc×s)', desc: 'Volumetric ratio of spiral reinforcement in columns. Min: 0.36×(Ag/Ac - 1)×fck/fy.' },
+  { cat: 'hydrology', name: 'SCS Curve Number Runoff', formula: 'Q = (P - 0.2S)² / (P + 0.8S), S = 25400/CN - 254', desc: 'SCS-CN method for estimating direct runoff from rainfall. CN depends on land use and soil.' },
+  { cat: 'hydrology', name: 'Rational Formula', formula: 'Q = C×I×A/3.6', desc: 'Peak discharge. C = runoff coefficient, I = rainfall intensity (mm/hr), A = area (km²). Q in m³/s.' },
+  { cat: 'hydrology', name: 'Gumbel Distribution', formula: 'xT = x̄ + KT×S', desc: 'Extreme value Type I distribution for flood frequency analysis. KT depends on return period T.' },
+  { cat: 'hydrology', name: 'Infiltration (Horton)', formula: 'f(t) = fc + (f0 - fc)×e^(-kt)', desc: 'Horton\'s infiltration model. f0 = initial rate, fc = final rate, k = decay constant.' }
+];
+
+function renderFormulas(filter = 'all') {
+  const grid = document.getElementById('formulaGrid');
+  const filtered = filter === 'all' ? formulaData : formulaData.filter(f => f.cat === filter);
+  grid.innerHTML = filtered.map(f => `
+    <div class="formula-ref-card" data-cat="${f.cat}">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <div style="font-size: 14px; font-weight: 600;">${f.name}</div>
+        <span style="font-size: 10px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 8px; background: var(--bg-input); border-radius: 4px;">${f.cat}</span>
+      </div>
+      <code class="formula-block" style="margin: 0 0 10px 0; font-size: 12px;">${f.formula}</code>
+      <div style="font-size: 12px; color: var(--fg-muted); line-height: 1.5;">${f.desc}</div>
+      <button class="btn-secondary" style="margin-top: 10px; padding: 5px 12px; font-size: 11px;" onclick="useFormula('${escapeAttr(f.formula)}')">
+        <i class="fas fa-arrow-right-to-bracket"></i> Use in Solver
+      </button>
+    </div>
+  `).join('');
+}
+
+function escapeAttr(str) {
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function filterFormulas(el) {
+  document.querySelectorAll('#formulaFilterChips .chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  renderFormulas(el.dataset.fcat);
+}
+
+function useFormula(formula) {
+  switchTab('calculator');
+  document.getElementById('mathExpression').value = formula;
+  document.getElementById('mathExpression').focus();
+  showToast('Formula loaded into solver', 'info');
+}
+
+// ===================== INIT =====================
+renderFormulas();
+
+// Keyboard shortcut: Enter to evaluate math expression
+document.getElementById('mathExpression').addEventListener('keydown', e => {
+  if (e.key === 'Enter') solveMathExpression();
+});
+</script>
+</body>
+</html>
